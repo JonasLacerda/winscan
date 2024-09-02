@@ -4,9 +4,40 @@ from PIL import Image, ImageEnhance, ImageTk
 from prints import list_devices, get_device_manager, scan_and_save, nome_arquivo
 from file_listbox import update_file_list, selecao
 import os
+import threading
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 original_scanned_img_tk = None
 scanned_img_label = None 
+
+class DirectoryEventHandler(FileSystemEventHandler):
+    def __init__(self, file_listbox):
+        self.file_listbox = file_listbox
+
+    def on_any_event(self, event):
+        if event.is_directory:
+            return None
+        elif event.event_type in ('created', 'modified', 'deleted'):
+            self.file_listbox.after(0, update_file_list, self.file_listbox)
+
+def start_observer(file_listbox):
+    event_handler = DirectoryEventHandler(file_listbox)
+    observer = Observer()
+    observer.schedule(event_handler, scanned_directory, recursive=False)
+    observer_thread = threading.Thread(target=observer.start)
+    observer_thread.daemon = True
+    observer_thread.start()
+    return observer
+
+def start_observer(file_listbox):
+    event_handler = DirectoryEventHandler(file_listbox)
+    observer = Observer()
+    observer.schedule(event_handler, scanned_directory, recursive=False)
+    observer_thread = threading.Thread(target=observer.start)
+    observer_thread.daemon = True
+    observer_thread.start()
+    return observer
 
 def display_scanned_image(file_path):
     global original_scanned_img_tk, scanned_img_canvas, scanned_img_id
@@ -220,6 +251,12 @@ rename_button.grid(row=0, column=0, padx=5, pady=5)
 # Botão Excluir
 delete_button = tk.Button(button_frame, text="Excluir", command=delete_selected_file)
 delete_button.grid(row=0, column=1, padx=5, pady=5)
+
+# Inicie o observador de diretório
+observer = start_observer(file_listbox)
+
+# Adicione a função de atualização de arquivos à lista
+update_file_list(file_listbox)
 
 # Initial update of the file list
 update_file_list(file_listbox)
