@@ -239,13 +239,20 @@ class FileListBox:
                 file_listbox.update()
 
                 # Seleciona o item renomeado e rola para ele
-                index = file_listbox.file_listbox.get(0, tk.END).index(new_name)
-                file_listbox.file_listbox.selection_set(index)
-                file_listbox.file_listbox.activate(index)
-                file_listbox.file_listbox.focus()
-                
-                # Garante que o item renomeado esteja visível
-                file_listbox.file_listbox.see(index)
+                window.after(50, lambda: select_renamed_item(new_name))
+
+            def select_renamed_item(new_name):
+                index = None
+                for i, item in enumerate(file_listbox.file_listbox.get(0, tk.END)):
+                    if item == new_name:
+                        index = i
+                        break
+
+                if index is not None:
+                    file_listbox.file_listbox.selection_set(index)
+                    file_listbox.file_listbox.activate(index)
+                    file_listbox.file_listbox.see(index)
+
 
             new_name_entry.bind("<Return>", submit_new_name)
             tk.Button(entry_button_frame, text="Renomear", command=submit_new_name).pack(side=tk.LEFT, padx=5)
