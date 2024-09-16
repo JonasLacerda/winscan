@@ -9,14 +9,6 @@ import threading
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-class DirectoryEventHandler(FileSystemEventHandler):
-    def __init__(self, file_listbox):
-        self.file_listbox = file_listbox
-
-    def on_modified(self, event):
-        if not event.is_directory:
-            self.file_listbox.update()
-
 def start_observer(file_listbox):
     event_handler = DirectoryEventHandler(file_listbox)
     observer = Observer()
@@ -45,9 +37,9 @@ def scan_and_save():
     selected_scanner_index = scanner_combobox.current()
     scanner_id = scanner_ids[selected_scanner_index]
 
-    file_path_template = "C:\\Users\\Jonas\\Documents\\Scanned Documents\\?.jpg"
     nome = file_name_entry.get()
-    file_path = file_path_template.replace("?", nome)
+    file_path_template = os.path.join(scanned_directory, f"{nome}.jpg")
+    file_path = get_next_filename(file_path_template)
 
     scanning_thread = threading.Thread(target=scan_image, args=(scanner_id, file_path))
     scanning_thread.start()
@@ -184,6 +176,8 @@ class FileListBox:
             filename = self.file_listbox.get(index[0])
             file_path = os.path.join(self.directory, filename)
             display_scanned_image(file_path)
+        else:
+            result_label.config(text="Nenhum arquivo selecionado.")
 
     def get_selected_file(self):
         index = self.file_listbox.curselection()
@@ -242,6 +236,7 @@ class FileListBox:
                 window.after(50, lambda: select_renamed_item(new_name))
 
             def select_renamed_item(new_name):
+                print(new_name)
                 index = None
                 for i, item in enumerate(file_listbox.file_listbox.get(0, tk.END)):
                     if item == new_name:
@@ -249,6 +244,7 @@ class FileListBox:
                         break
 
                 if index is not None:
+                    print(index)
                     file_listbox.file_listbox.selection_set(index)
                     file_listbox.file_listbox.activate(index)
                     file_listbox.file_listbox.see(index)
@@ -259,26 +255,23 @@ class FileListBox:
 
 class DirectoryEventHandler(FileSystemEventHandler):
     def __init__(self, file_listbox):
+        super().__init__()
         self.file_listbox = file_listbox
+        self.is_navigating = False  # Flag para identificar navegação
 
     def on_modified(self, event):
-        if not event.is_directory:
-            print(f"Arquivo modificado: {event.src_path}")  # Mensagem de log
-            self.update_file_listbox()
-
-    def on_created(self, event):
-        if not event.is_directory:
-            print(f"Arquivo criado: {event.src_path}")  # Mensagem de log
-            self.update_file_listbox()
-
-    def on_deleted(self, event):
-        if not event.is_directory:
-            print(f"Arquivo excluído: {event.src_path}")  # Mensagem de log
-            self.update_file_listbox()
+        # Se estiver navegando na lista, ignorar o evento de modificação
+        if self.is_navigating:
+            return
+        
+        # Código original que atualiza o file_listbox
+        self.update_file_listbox()
 
     def update_file_listbox(self):
-        # Atualiza o file_listbox na thread principal
-        window.after(0, self.file_listbox.update)
+        # Atualize a lista de arquivos no listbox
+        self.file_listbox.delete(0, tk.END)
+        for filename in os.listdir(scanned_directory):
+            self.file_listbox.insert(tk.END, filename)
 
 # Define other functions here (e.g., scan_image, display_scanned_image, etc.)
 
@@ -331,7 +324,7 @@ button_frame = tk.Frame(window)
 button_frame.grid(row=5, column=3, padx=5, pady=5)
 
 # Botão Renomear
-rename_button = tk.Button(button_frame, text="Renomear", command=file_listbox.rename_selected_file)
+rename_button = tk.Button(button_frame, text="Renomear", command=lambda: file_listbox.rename_selected_file())
 rename_button.grid(row=0, column=0, padx=5, pady=5)
 
 # Botão Excluir
@@ -345,10 +338,29 @@ def rename_selected_file(event=None):
     file_listbox.rename_selected_file()
 
 def on_select(event):
-    file_listbox.on_select(event)
+    # Ativar a flag antes de navegar
+    file_listbox.event_handler.is_navigating = True
+    
+    # Aqui vai o código para lidar com a seleção
+    selection_index = file_listbox.curselection()
+    if selection_index:
+        file_name = file_listbox.get(selection_index)
+        # Seu código para abrir ou exibir a imagem selecionada
+    
+    # Desativar a flag após a navegação
+    file_listbox.event_handler.is_navigating = False
+
 
 # Inicialize o observador
 observer = start_observer(file_listbox)
+
+def on_closing():
+    observer.stop()
+    observer.join()
+    window.destroy()
+
+window.protocol("WM_DELETE_WINDOW", on_closing)
+
 
 #evento do mouse em cima da imagem
 def on_mouse_wheel(event):
